@@ -1,0 +1,46 @@
+{
+  "name": "excel-formula",
+  "displayName": "excel-formula-formatter",
+  "description": "VS Code extension to format, indent, and highlight Excel formulas",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.104.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Formatters"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "excel-formula",
+        "aliases": [
+          "excel-formula",
+          "excel-formula"
+        ],
+        "extensions": [
+          ".xlf"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "excel-formula",
+        "scopeName": "source.excel-formula",
+        "path": "./syntaxes/excel-formula.tmLanguage.json"
+      }
+    ],
+    "configurationDefaults": {
+      "[excel-formula]": {
+        "editor.tabSize": 2,
+        "editor.insertSpaces": true,
+        "editor.formatOnPaste": true
+      }
+    }
+  },
+  "main": "./extension.js",
+  "activationEvents": [
+    "onLanguage:excel-formula"
+  ]
+}

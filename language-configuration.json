@@ -1,0 +1,36 @@
+{
+  "brackets": [
+    ["(", ")"],
+    ["{", "}"]
+  ],
+  "autoClosingPairs": [
+    { "open": "(", "close": ")" },
+    { "open": "{", "close": "}" },
+    { "open": "\"", "close": "\"", "notIn": ["string"] }
+  ],
+  "surroundingPairs": [
+    ["(", ")"],
+    ["{", "}"],
+    ["\"", "\""]
+  ],
+  "indentationRules": {
+    "increaseIndentPattern": "^.*(?:\\(|\\{)(?!.*[\\)\\}]).*$",
+    "decreaseIndentPattern": "^\\s*[\\)\\}]"
+  },
+  "onEnterRules": [
+    {
+      "beforeText": ".*\\([^\\)]*$",
+      "afterText": "^\\s*\\)",
+      "action": {
+        "indentAction": "IndentOutdent"
+      }
+    },
+    {
+      "beforeText": ".*\\([^\\)]*$",
+      "action": {
+        "indentAction": "Indent"
+      }
+    }
+  ],
+  "wordPattern": "\\$?[A-Za-z]{1,4}\\$?\\d{1,7}(?::\\$?[A-Za-z]{1,4}\\$?\\d{1,7})?|[A-Za-z_][A-Za-z0-9_\\.]*|\\d+(?:\\.\\d+)?"
+}
