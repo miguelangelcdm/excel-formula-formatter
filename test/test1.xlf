@@ -1,0 +1,24 @@
+ROUND(
+  IF(
+    PaymentCountry = "ECU",
+    IF(
+      BankID = 1069,
+      IF(
+        Amount * 1.75 % <= 1.50,
+        1.50,
+        Amount * 1.75 %
+      ),
+      IF(
+        Amount * 1.00 % <= 1.50,
+        1.50,
+        Amount * 1.00 %
+      )
+    ),
+    0
+  ) + IF(
+    PaymentCountry = "ECU",
+    Amount * EcuIsdTax,
+    0
+  ),
+  4
+)

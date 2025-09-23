@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <rect width="120" height="120" x="4" y="4" rx="16" fill="#25a764"/>
+  <rect width="120" height="120" x="4" y="4" rx="16" fill="none" stroke="#0a4426" stroke-width="8"/>
+  <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="'Segoe UI', sans-serif" font-weight="bold" font-size="58" fill="#ffffff">XLF</text>
+</svg>
