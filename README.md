@@ -30,6 +30,7 @@ Give complex Excel formulas the same polish you expect from code. This Visual St
 | Command | Purpose |
 | ------- | ------- |
 | `Excel Formula: Minify Document or Selection` | Collapse the active selection or entire file into a single-line formula while preserving strings and operators. |
+| `Excel Formula: Beautify Document or Selection` | Manually beautify the selection ot the entire file. |
 
 ## Configuration
 
