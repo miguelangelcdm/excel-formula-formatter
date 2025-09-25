@@ -16,8 +16,6 @@ Give complex Excel formulas the same polish you expect from code. This Visual St
 2. Search for **"Excel Formula Formatter"** and click **Install**.
 3. Reload the window if prompted and you're ready to format formulas.
 
-> Tip: If you're testing a local build, use **Extensions: Install from VSIX...** and select the generated package.
-}
 ## Everyday Use
 
 1. Save or open a file with the `.xlf` extension (or pick **Excel Formula** in the language mode picker).

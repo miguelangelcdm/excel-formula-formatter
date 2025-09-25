@@ -4,6 +4,27 @@
   "description": "VS Code extension to format, indent, and highlight Excel formulas",
   "icon": "./icons/excel-formula-icon.png",
   "version": "0.1.0",
+  "publisher": "MiguelGaray",
+  "license": "MIT",
+  "keywords": [
+    "excel",
+    "formula",
+    "formatter",
+    "beautify",
+    "minify",
+    "spreadsheet",
+    "office",
+    "xlf",
+    "powerquery",
+    "vba"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/miguelangelcdm/excel-formula-formatter.git"
+  },
+  "bugs": {
+    "url": "https://github.com/miguelangelcdm/excel-formula-formatter/issues"
+  },
   "engines": {
     "vscode": "^1.104.0"
   },

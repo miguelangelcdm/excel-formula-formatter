@@ -2,6 +2,9 @@ const vscode = require('vscode');
 
 // Function metadata lives in a separate module for easier maintenance.
 const FUNCTION_ITEMS = require('./function-items');
+const FUNCTION_LOOKUP = new Map(
+  FUNCTION_ITEMS.map(item => [item.name.toUpperCase(), item])
+);
 
 // Entry point for the VS Code extension lifecycle.
 function activate(context) {
@@ -56,6 +59,29 @@ function activate(context) {
     }
   });
 
+  const hoverProvider = vscode.languages.registerHoverProvider(selector, {
+    provideHover(document, position) {
+      const wordRange = document.getWordRangeAtPosition(position, /[A-Za-z][A-Za-z0-9_\.]*/);
+      if (!wordRange) {
+        return null;
+      }
+
+      const functionName = document.getText(wordRange).toUpperCase();
+      const metadata = FUNCTION_LOOKUP.get(functionName);
+      if (!metadata) {
+        return null;
+      }
+
+      const markdown = new vscode.MarkdownString();
+      markdown.appendCodeblock(metadata.signature, 'excel-formula');
+      if (metadata.detail) {
+        markdown.appendMarkdown(`\n\n${metadata.detail}`);
+      }
+
+      return new vscode.Hover(markdown, wordRange);
+    }
+  });
+
   // Command palette entry to collapse formulas to a compact representation.
   const minifyCommand = vscode.commands.registerCommand('excel-formula.minifyFormula', async () => {
     const editor = vscode.window.activeTextEditor;
@@ -81,6 +107,7 @@ function activate(context) {
     completionProvider,
     formattingProvider,
     rangeFormattingProvider,
+    hoverProvider,
     minifyCommand,
     beautifyCommand
   );
