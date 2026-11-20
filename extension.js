@@ -20,7 +20,11 @@ function activate(context) {
           item.detail = fn.signature;
           item.documentation = fn.detail;
           item.insertText = new vscode.SnippetString(`${fn.name}($0)`);
-          item.commitCharacters = ['('];
+          // commitCharacters intentionally omitted (issue #3): committing on '('
+          // inserted the snippet NAME($0) and then the typed '(', yielding NAME(()).
+          // Typing '(' now closes the widget and inserts normally; Enter/Tab still
+          // commit the snippet. The '(' trigger registration below is kept so the
+          // list still pops up on '('.
           return item;
         });
         return items;
