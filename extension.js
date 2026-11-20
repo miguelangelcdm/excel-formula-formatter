@@ -6,6 +6,10 @@ const FUNCTION_LOOKUP = new Map(
   FUNCTION_ITEMS.map(item => [item.name.toUpperCase(), item])
 );
 
+// Diagnostics state kept at module scope so deactivate() can dispose it.
+let diagnosticCollection = undefined;
+let validationTimer = undefined;
+
 // Entry point for the VS Code extension lifecycle.
 function activate(context) {
   const selector = { language: 'excel-formula', scheme: '*' };
@@ -107,17 +111,70 @@ function activate(context) {
     await transformDocumentOrSelection(editor, formatFormula);
   });
 
+  // Syntax diagnostics for formulas (issue #2).
+  diagnosticCollection = vscode.languages.createDiagnosticCollection('excel-formula');
+
+  const validateDocument = document => {
+    if (!document || document.languageId !== 'excel-formula') {
+      return;
+    }
+    const text = document.getText();
+    const diagnostics = checkFormula(text).map(diagnostic => {
+      // Derive the end position from the document so multi-line spans
+      // (e.g. an unterminated string) stay inside valid positions.
+      const startOffset = document.offsetAt(
+        new vscode.Position(diagnostic.line, diagnostic.character)
+      );
+      const range = new vscode.Range(
+        new vscode.Position(diagnostic.line, diagnostic.character),
+        document.positionAt(startOffset + diagnostic.length)
+      );
+      return new vscode.Diagnostic(range, diagnostic.message, vscode.DiagnosticSeverity.Error);
+    });
+    diagnosticCollection.set(document, diagnostics);
+  };
+
+  const scheduleValidation = document => {
+    if (validationTimer) {
+      clearTimeout(validationTimer);
+    }
+    validationTimer = setTimeout(() => validateDocument(document), 300);
+  };
+
+  // Validate documents that were already open when the extension activated.
+  vscode.workspace.textDocuments.forEach(validateDocument);
+
+  const openListener = vscode.workspace.onDidOpenTextDocument(validateDocument);
+  const changeListener = vscode.workspace.onDidChangeTextDocument(
+    event => scheduleValidation(event.document)
+  );
+  const closeListener = vscode.workspace.onDidCloseTextDocument(document => {
+    diagnosticCollection.delete(document);
+  });
+
   context.subscriptions.push(
     completionProvider,
     formattingProvider,
     rangeFormattingProvider,
     hoverProvider,
     minifyCommand,
-    beautifyCommand
+    beautifyCommand,
+    openListener,
+    changeListener,
+    closeListener
   );
 }
 
-function deactivate() {}
+function deactivate() {
+  if (validationTimer) {
+    clearTimeout(validationTimer);
+    validationTimer = undefined;
+  }
+  if (diagnosticCollection) {
+    diagnosticCollection.dispose();
+    diagnosticCollection = undefined;
+  }
+}
 
 // Friendly formatter that breaks multi-line formulas into readable chunks.
 function formatFormula(input) {
@@ -374,18 +431,102 @@ function formatSingleFormula(formula) {
   return lines.join('\n');
 }
 
+// Conservative syntax checks powering the diagnostics provider (issue #2).
+// Returns { message, line, character, length } with 0-based line/character
+// offsets relative to the full input. Only flags what is certainly wrong.
+function checkFormula(input) {
+  const diagnostics = [];
+  if (!input) {
+    return diagnostics;
+  }
+
+  // Line starts let us map token offsets back to line/character positions.
+  const lineStarts = [0];
+  for (let i = 0; i < input.length; i += 1) {
+    if (input[i] === '\n' || (input[i] === '\r' && input[i + 1] !== '\n')) {
+      lineStarts.push(i + 1);
+    }
+  }
+
+  const report = (message, offset, length) => {
+    let line = lineStarts.length - 1;
+    while (line > 0 && lineStarts[line] > offset) {
+      line -= 1;
+    }
+    diagnostics.push({
+      message,
+      line,
+      character: offset - lineStarts[line],
+      length: Math.max(length, 1)
+    });
+  };
+
+  const tokens = tokenize(input);
+  const openers = [];
+  const matchingOpener = { ')': '(', '}': '{' };
+
+  for (let i = 0; i < tokens.length; i += 1) {
+    const token = tokens[i];
+    const prev = tokens[i - 1];
+    const next = tokens[i + 1];
+
+    if (token.type === 'word' && token.unterminated) {
+      report('Unterminated string literal', token.start, token.value.length);
+    }
+
+    if (token.type === 'punct') {
+      if (token.value === '(' || token.value === '{') {
+        openers.push(token);
+      } else if (token.value === ')' || token.value === '}') {
+        const open = openers[openers.length - 1];
+        if (!open || open.value !== matchingOpener[token.value]) {
+          report(`Unmatched '${token.value}'`, token.start, 1);
+        } else {
+          openers.pop();
+        }
+        if (prev && prev.type === 'punct' && (prev.value === ',' || prev.value === ';')) {
+          report(`Trailing comma before '${token.value}'`, prev.start, 1);
+        }
+      }
+      continue;
+    }
+
+    if (token.type === 'word' && openers.length && prev) {
+      // Adjacent arguments without a comma inside a call/array. Kept narrow
+      // to avoid false positives: "SUM(A) B" and "word word(" juxtapositions
+      // are never valid, while bare "A1 B2" pairs are left alone.
+      const prevIsClosedCall = prev.type === 'punct' && (prev.value === ')' || prev.value === '}');
+      const opensFunctionCall =
+        next && next.type === 'punct' && next.value === '(';
+      if (prevIsClosedCall || (prev.type === 'word' && opensFunctionCall)) {
+        report(`Missing ',' before '${token.value}'`, token.start, token.value.length);
+      }
+    }
+  }
+
+  openers.forEach(token => {
+    report(`Unclosed '${token.value}'`, token.start, 1);
+  });
+
+  return diagnostics;
+}
+
 // Shared tokenizer so formatting and minify stay in sync.
+// Each token carries a `start` offset so checkFormula can report positions;
+// format/minify only read `type` and `value`, so the extra fields are inert.
 function tokenize(source) {
   const tokens = [];
   let buffer = '';
+  let bufferStart = -1;
   let inString = false;
 
   const flushBuffer = () => {
     if (!buffer) {
       return;
     }
-    tokens.push({ type: 'word', value: buffer });
+    tokens.push({ type: 'word', value: buffer, start: bufferStart });
     buffer = '';
+    bufferStart = -1;
   };
 
   for (let i = 0; i < source.length; i += 1) {
@@ -399,8 +540,9 @@ function tokenize(source) {
           i += 1;
           continue;
         }
-        tokens.push({ type: 'string', value: buffer });
+        tokens.push({ type: 'string', value: buffer, start: bufferStart });
         buffer = '';
+        bufferStart = -1;
         inString = false;
       }
       continue;
@@ -409,6 +551,7 @@ function tokenize(source) {
     if (ch === '"') {
       flushBuffer();
       buffer = '"';
+      bufferStart = i;
       inString = true;
       continue;
     }
@@ -421,28 +564,32 @@ function tokenize(source) {
     const twoChar = source.slice(i, i + 2);
     if (twoChar === '>=' || twoChar === '<=' || twoChar === '<>') {
       flushBuffer();
-      tokens.push({ type: 'operator', value: twoChar });
+      tokens.push({ type: 'operator', value: twoChar, start: i });
       i += 1;
       continue;
     }
 
     if (',;(){}'.includes(ch)) {
       flushBuffer();
-      tokens.push({ type: 'punct', value: ch });
+      tokens.push({ type: 'punct', value: ch, start: i });
       continue;
     }
 
     if ('+-*/^&=%'.includes(ch) || ['=', '>', '<'].includes(ch)) {
       flushBuffer();
-      tokens.push({ type: 'operator', value: ch });
+      tokens.push({ type: 'operator', value: ch, start: i });
       continue;
     }
 
+    if (!buffer) {
+      bufferStart = i;
+    }
     buffer += ch;
   }
 
   if (buffer) {
-    tokens.push({ type: 'word', value: buffer });
+    // A word flagged `unterminated` came from a string literal that never closed.
+    tokens.push({ type: 'word', value: buffer, start: bufferStart, unterminated: inString });
   }
 
   return tokens;
@@ -496,4 +643,5 @@ module.exports = {
   deactivate,
   _formatFormula: formatFormula,
   _minifyFormula: minifyFormula,
+  _checkFormula: checkFormula,
 };
