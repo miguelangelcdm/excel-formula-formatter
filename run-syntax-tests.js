@@ -295,6 +295,30 @@ test('minifyFormula still collapses a multi-line formula', () => {
   assert.strictEqual(minifyFormula(input), '=IF(A1>5,"big",SUM(B1:B9))');
 });
 
+// --- postfix percent literals -------------------------------------------------
+
+test('percent literals keep their number when formatted', () => {
+  const input = '=IF(A1*2.50%<=2.40,2.40,A1*3%)';
+  const formatted = formatFormula(input);
+  assert.ok(formatted.includes('2.50%'), `literal split up in:\n${formatted}`);
+  assert.ok(formatted.includes('3%'), `literal split up in:\n${formatted}`);
+  // A space before '%' means the tokenizer split the literal (issue: "2.50 %").
+  assert.ok(!formatted.includes(' %'), `stray space detached a percent in:\n${formatted}`);
+  assert.strictEqual(formatFormula(formatted), formatted, 'formatter not idempotent');
+});
+
+test('percent formulas round-trip through format and minify', () => {
+  const input = '=ROUND(IF(PaymentCountry="PER",Amount*2.50%,Amount*3.00%),2)';
+  const roundTripped = minifyFormula(formatFormula(input));
+  assert.strictEqual(roundTripped, minifyFormula(input));
+  assert.ok(roundTripped.includes('Amount*2.50%'), roundTripped);
+  assert.ok(roundTripped.includes('Amount*3.00%'), roundTripped);
+});
+
+test('percent literals do not confuse the checker', () => {
+  assert.deepStrictEqual(checkFormula('=SUM(A1*2.5%,B1*3%)'), []);
+});
+
 // --- issue #3: completion items must not commit on '(' -----------------------
 
 test('completion items have no commitCharacters (issue #3)', () => {

@@ -575,6 +575,16 @@ function tokenize(source) {
       continue;
     }
 
+    // In Excel '%' is a postfix part of a numeric literal (2.50%), not a
+    // binary operator. Glue it to a preceding digit so the percent stays one
+    // word token; otherwise the formatter emits a stray space ("2.50 %").
+    // Side effect: an A1% cell-ref postfix also glues, an acceptable
+    // trade-off to keep percent literals intact for format and minify.
+    if (ch === '%' && /[0-9]$/.test(buffer)) {
+      buffer += ch;
+      continue;
+    }
+
     if ('+-*/^&=%'.includes(ch) || ['=', '>', '<'].includes(ch)) {
       flushBuffer();
       tokens.push({ type: 'operator', value: ch, start: i });
